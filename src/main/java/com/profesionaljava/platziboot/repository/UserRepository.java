@@ -21,8 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   List<User> findByName(String name);
 
-  //Documentation: https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#jpa.query-methods
-
   Optional<User> findByEmailAndName(String email, String name);
 
   List<User> findByNameLike(String name);
