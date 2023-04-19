@@ -4,9 +4,11 @@ import com.profesionaljava.platziboot.bean.MyBean;
 import com.profesionaljava.platziboot.bean.MyBeanWithDependency;
 import com.profesionaljava.platziboot.bean.MyBeanWithProperties;
 import com.profesionaljava.platziboot.component.ComponentDependency;
+import com.profesionaljava.platziboot.dto.UserDto;
 import com.profesionaljava.platziboot.entity.User;
 import com.profesionaljava.platziboot.pojo.UserPojo;
 import com.profesionaljava.platziboot.repository.UserRepository;
+import com.profesionaljava.platziboot.service.UserService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.aop.scope.ScopedProxyUtils;
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @SpringBootApplication
 public class PlatzibootApplication implements CommandLineRunner {
@@ -33,15 +36,17 @@ public class PlatzibootApplication implements CommandLineRunner {
   private MyBeanWithProperties myBeanWithProperties;
   private UserPojo userPojo;
   private UserRepository userRepository;
+  private UserService userService;
 
   //@Autowired --> ya no es obligatorio
-  public PlatzibootApplication(@Qualifier("componentTwoImplement") ComponentDependency componentDependency, MyBean myBean, MyBeanWithDependency myBeanWithDependency, MyBeanWithProperties myBeanWithProperties, UserPojo userPojo, UserRepository userRepository) {
+  public PlatzibootApplication(@Qualifier("componentTwoImplement") ComponentDependency componentDependency, MyBean myBean, MyBeanWithDependency myBeanWithDependency, MyBeanWithProperties myBeanWithProperties, UserPojo userPojo, UserRepository userRepository, UserService userService) {
     this.componentDependency = componentDependency;
     this.myBean = myBean;
     this.myBeanWithDependency = myBeanWithDependency;
     this.myBeanWithProperties = myBeanWithProperties;
     this.userPojo = userPojo;
     this.userRepository = userRepository;
+    this.userService = userService;
   }
 
   public static void main(String[] args) {
@@ -53,6 +58,25 @@ public class PlatzibootApplication implements CommandLineRunner {
 //    ejemplosAnteriores();
     saveUsersInDataBase();
     getInformationJpqlFromUser();
+    saveWithErrorTransactional();
+  }
+
+  private void saveWithErrorTransactional(){
+    User test1 = new User("Test1Transactional1", "Test1Transactional1@domain.com", LocalDate.of(2020,1,1));
+    User test2 = new User("Test2Transactional1", "Test2Transactional1@domain.com", LocalDate.of(2020,1,1));
+    User test3 = new User("Test3Transactional1", "Test1Transactional1@domain.com", LocalDate.of(2020,1,1));
+    User test4 = new User("Test4Transactional1", "Test4Transactional1@domain.com", LocalDate.of(2020,1,1));
+
+    List<User> users = Arrays.asList(test1, test2, test3, test4);
+    //Rollback con la anotación transactional
+    try {
+      userService.saveTransactional(users);
+    }catch (Exception e){
+      LOGGER.error("Esta es una excepcion dentro del metodo transaccional " + e);
+    }
+    userService.getAllUsers().stream()
+        .forEach(user ->
+            LOGGER.info("Este es el usuario dentro del metodo transaccional: " + user));
   }
 
   private void getInformationJpqlFromUser(){
@@ -71,30 +95,34 @@ public class PlatzibootApplication implements CommandLineRunner {
     LOGGER.info("Usuario con query method findByEmailAndName " + userRepository.findByEmailAndName("user2@gmail.com", "user2")
         .orElseThrow(()-> new RuntimeException("Usuario no encontrado por Email ni por Nombre")));
 
+    //OR - LIKE
     userRepository.findByNameLike("%er1%")
         .stream()
         .forEach(user -> LOGGER.info("Usuario findByNameLike: "+user));
-
     userRepository.findByNameOrEmail(null, "user11@gmail.com")
         .stream()
         .forEach(user -> LOGGER.info("Usuario findByNameOrEmail: "+user));
-
     userRepository.findByNameOrEmail("user12", null)
         .stream()
-        .forEach(user -> LOGGER.info("Usuario findByNameOrEmail: "+user));
-
-
+        .forEach(user -> LOGGER.info("Usuario findByNameOrEmail x: "+user));
+    // BETWEEN
     userRepository.findByBirthDateBetween(LocalDate.of(2020,3,1), LocalDate.of(2020,7,1))
         .stream()
         .forEach(user -> LOGGER.info("Usuario con intervalo de fechas: "+user));
-
+    // ORDER BY
     userRepository.findByNameLikeOrderByIdDesc("%user1%")
         .stream()
         .forEach(user -> LOGGER.info("Usuario encontrado con like y ordenado descendente " + user));
-
+    // PODEROSO CONTAINING!!!!
     userRepository.findByNameContainingOrderByIdAsc("user1")
         .stream()
-        .forEach(user -> LOGGER.info("Usuario encontrado con containing y ordenado ascendente "+ user));
+        .forEach(user -> LOGGER.info("Usuario encontrado con CONTAINING y ordenado ascendente "+ user));
+
+    //  NAMED PARAMETERS dentro de los Query methods
+    LOGGER.info("El usuario a partir del named @Param es: " + userRepository.getAllByBirthDateAndEmail(LocalDate.of(2020,7,7),
+            "user7@gmail.com")
+        .orElseThrow(()->
+            new RuntimeException("No se encontro el usuario a partir del named @Param")));
 
   }
 
