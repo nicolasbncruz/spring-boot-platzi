@@ -19,7 +19,7 @@ public class User {
   @Column(length = 50)
   private String name;
 
-  @Column(length = 50, unique = true)
+  @Column(length = 50, unique = true)//el correo es unico
   private String email;
 
   private LocalDate birthDate;
